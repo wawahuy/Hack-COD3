@@ -7,15 +7,19 @@
 #include <stdio.h>
 #include <Psapi.h>
 #include "AppProcess.h"
+#include "KeyboardHook.h"
 
 using namespace std;
 
+
 //0x0003A784 
 enum EOffsetPlayerData {
+    X = 0x1C,
+    Y = 0x20,
+    Z = 0x24,
     Bullet1 = 0x358,
     BulletReload1 = 0x3D0,
     BulletReload2 = 0x3E8,
-    Heal = 0x160
 };
 
 int main() {
@@ -31,10 +35,26 @@ int main() {
     cout << "Base exe address: " << appAddress << endl;
     cout << "Player address: " << playerDataAddress << endl;
 
+    KeyboardHook::getInstance()->async();
+    KeyboardHook::getInstance()->listen([&](DWORD vk, DWORD code) {
+        if (vk == VK_SPACE) {
+            float z;
+            if (!p->readProcessMemory(playerDataAddress + EOffsetPlayerData::Z, z)) {
+                cout << "Couldn't read process memory";
+                return -1;
+            }
+            z += 200;
+            if (!p->writeProcessMemory(playerDataAddress + EOffsetPlayerData::Z, z)) {
+                cout << "Couldn't write process memory" << endl;
+            }
+        }
+    });
+
     // update data
     int newBullet = 2000;
     int newReBullet = 200;
     int newHeal = 1000;
+
     while (true) {
         if (!p->writeProcessMemory(playerDataAddress + EOffsetPlayerData::Bullet1, newBullet)) {
             cout << "Couldn't write process memory" << endl;
@@ -45,10 +65,7 @@ int main() {
         if (!p->writeProcessMemory(playerDataAddress + EOffsetPlayerData::BulletReload2, newReBullet)) {
             cout << "Couldn't write process memory" << endl;
         }
-    /*    if (!p->writeProcessMemory(playerDataAddress + EOffsetPlayerData::Heal, newHeal)) {
-            cout << "Couldn't write process memory" << endl;
-        }*/
-        Sleep(1000);
+        Sleep(500);
     }
 
     delete p;
