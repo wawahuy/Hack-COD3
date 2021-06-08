@@ -11,6 +11,11 @@
 
 using namespace std;
 
+enum EEntity {
+    Base = 0x00E7DC50,
+    Next = 0x74,
+    In_heal = 0x150
+};
 
 //0x0003A784 
 enum EOffsetPlayerData {
@@ -35,20 +40,31 @@ int main() {
     cout << "Base exe address: " << appAddress << endl;
     cout << "Player address: " << playerDataAddress << endl;
 
-    KeyboardHook::getInstance()->async();
-    KeyboardHook::getInstance()->listen([&](DWORD vk, DWORD code) {
-        if (vk == VK_SPACE) {
-            float z;
-            if (!p->readProcessMemory(playerDataAddress + EOffsetPlayerData::Z, z)) {
-                cout << "Couldn't read process memory";
-                return -1;
-            }
-            z += 200;
-            if (!p->writeProcessMemory(playerDataAddress + EOffsetPlayerData::Z, z)) {
-                cout << "Couldn't write process memory" << endl;
-            }
-        }
-    });
+    //KeyboardHook::getInstance()->async();
+    //KeyboardHook::getInstance()->listen([&](DWORD vk, DWORD code) {
+    //    if (vk == VK_SPACE) {
+    //        float z;
+    //        if (!p->readProcessMemory(playerDataAddress + EOffsetPlayerData::Z, z)) {
+    //            cout << "Couldn't read process memory";
+    //            return -1;
+    //        }
+    //        z += 200;
+    //        if (!p->writeProcessMemory(playerDataAddress + EOffsetPlayerData::Z, z)) {
+    //            cout << "Couldn't write process memory" << endl;
+    //        }
+    //    }
+    //    if (vk == VK_BACK) {
+    //        float z;
+    //        if (!p->readProcessMemory(playerDataAddress + EOffsetPlayerData::Z, z)) {
+    //            cout << "Couldn't read process memory";
+    //            return -1;
+    //        }
+    //        z -= 200;
+    //        if (!p->writeProcessMemory(playerDataAddress + EOffsetPlayerData::Z, z)) {
+    //            cout << "Couldn't write process memory" << endl;
+    //        }
+    //    }
+    //});
 
     // update data
     int newBullet = 2000;
@@ -56,16 +72,23 @@ int main() {
     int newHeal = 1000;
 
     while (true) {
+        system("cls");
+        for (int i = 0; i < 14; i++) {
+            DWORD address;
+            if (p->readProcessMemory(appAddress + EEntity::Base + EEntity::Next * i, address)) {
+                int healEn;
+                if (p->readProcessMemory(address + EEntity::In_heal, healEn)) {
+                    cout << address << " address: " << healEn << endl;
+                }
+            }
+        }
         if (!p->writeProcessMemory(playerDataAddress + EOffsetPlayerData::Bullet1, newBullet)) {
             cout << "Couldn't write process memory" << endl;
         }
         if (!p->writeProcessMemory(playerDataAddress + EOffsetPlayerData::BulletReload1, newReBullet)) {
             cout << "Couldn't write process memory" << endl;
         }
-        if (!p->writeProcessMemory(playerDataAddress + EOffsetPlayerData::BulletReload2, newReBullet)) {
-            cout << "Couldn't write process memory" << endl;
-        }
-        Sleep(500);
+        Sleep(1000);
     }
 
     delete p;
