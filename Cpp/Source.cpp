@@ -8,6 +8,7 @@
 #include <Psapi.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <glm/vec2.hpp>
 
 #include "AppProcess.h"
 
@@ -16,7 +17,7 @@ using namespace std;
 int main(void)
 {
     GLFWwindow* window;
-
+    
     /* Initialize the library */
     if (!glfwInit())
         return -1;
