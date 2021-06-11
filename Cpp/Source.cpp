@@ -78,7 +78,7 @@ int main() {
             if (p->readProcessMemory(appAddress + EEntity::Base + EEntity::Next * i, address)) {
                 int healEn;
                 if (p->readProcessMemory(address + EEntity::In_heal, healEn)) {
-                    cout << address << " address: " << healEn << endl;
+                    cout << i << " - " << address << " address: " << healEn << endl;
                 }
             }
         }
