@@ -143,6 +143,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AppProcess.cpp" />
+    <ClCompile Include="include\imgui\imgui.cpp" />
+    <ClCompile Include="include\imgui\imgui_demo.cpp" />
+    <ClCompile Include="include\imgui\imgui_draw.cpp" />
+    <ClCompile Include="include\imgui\imgui_impl_glfw.cpp" />
+    <ClCompile Include="include\imgui\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="include\imgui\imgui_tables.cpp" />
+    <ClCompile Include="include\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Note.cpp" />
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
