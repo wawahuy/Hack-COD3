@@ -5,8 +5,6 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <Windows.h>
-#define GLFW_MOUSE_PASSTHROUGH   0x0002000D
-
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
 #pragma comment(lib, "legacy_stdio_definitions")
