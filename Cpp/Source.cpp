@@ -1,10 +1,16 @@
 ﻿#include "imgui/imgui.h"
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
+#include <iostream>
 #include <stdio.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <Windows.h>
+#include <glm/glm.hpp>
+#include <glm/ext.hpp>
+#include <glm/gtx/string_cast.hpp>
+#include "Address.h"
+#include "AppProcess.h"
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
 #pragma comment(lib, "legacy_stdio_definitions")
@@ -30,25 +36,31 @@ int main(int, char**)
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 
     // get monitor
-    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
-    if (!monitor) {
-        return 0;
-    }
-    const int width = glfwGetVideoMode(monitor)->width;
-    const int height = glfwGetVideoMode(monitor)->height;
+    //GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+    //if (!monitor) {
+    //    return 0;
+    //}
+    //const int width = glfwGetVideoMode(monitor)->width;
+    //const int height = glfwGetVideoMode(monitor)->height;
+
+    // get process game
+    AppProcess* p = AppProcess::Create(_T("Call of Duty®: Modern Warfare® 3"));
+    glm::u32vec2 gameWindowSize = p->getWindowSize();
+    glm::u32vec2 gameWindowPosition = p->getWindowPosition();
 
     // hint
     glfwWindowHint(GLFW_FLOATING, true);
     glfwWindowHint(GLFW_RESIZABLE, false);
-    glfwWindowHint(GLFW_MAXIMIZED, true);
+    //glfwWindowHint(GLFW_MAXIMIZED, true);
     glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, true);
 
     // Create window with graphics context
-    GLFWwindow* window = glfwCreateWindow(width, height, "Dear ImGui GLFW+OpenGL3 example", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(gameWindowSize.x, gameWindowSize.y, "Dear ImGui GLFW+OpenGL3 example", NULL, NULL);
     if (window == NULL)
         return 1;
 
     // Attr
+    glfwSetWindowPos(window, gameWindowPosition.x, gameWindowPosition.y);
     glfwSetWindowAttrib(window, GLFW_DECORATED, false);
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
@@ -76,8 +88,22 @@ int main(int, char**)
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
-    // test
     bool visibleMenu = false;
+    glfwSetWindowAttrib(window, GLFW_MOUSE_PASSTHROUGH, !visibleMenu);
+
+    glm::mat4 matrixProjection = glm::perspective(glm::pi<float>() * 0.25f, gameWindowSize.x / (float)gameWindowSize.y, 0.1f, 100.f);
+    glm::mat4 view = glm::lookAt(
+        glm::vec3(4, 3, 3), // Camera is at (4,3,3), in World Space
+        glm::vec3(0, 0, 0), // and looks at the origin
+        glm::vec3(0, 1, 0)  // Head is up (set to 0,-1,0 to look upside-down)
+    );
+    glm::mat4 model = glm::mat4(1.0f);
+    glm::mat4 matrixMul = matrixProjection * view * model;
+    glm::vec4 test1 = matrixMul * glm::vec4(0.1f, 0.2f, 0.3f, 1.0f);
+    glm::vec4 test2 = matrixMul * glm::vec4(0.2f, 0.3f, 100.0f, 1.0f);
+    std::cout << glm::to_string(test1) << glm::to_string(test2) << std::endl;
+
+    glEnable(GL_DEPTH_TEST);
 
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -101,14 +127,27 @@ int main(int, char**)
             }
         }
 
+        
+
         // Rendering
         ImGui::Render();
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
-        glClear(GL_COLOR_BUFFER_BIT);
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+
+
+        glLoadIdentity();
+
+        glColor3f(1.0f, 1.0f, 1.0f);
+        glLineWidth(3.0f);
+        glBegin(GL_LINES);
+        glVertex4fv(&test1.x);
+        glVertex4fv(&test2.x);
+        glEnd();
+
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
     }
 

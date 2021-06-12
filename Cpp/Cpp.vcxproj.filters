@@ -53,5 +53,8 @@
     <ClInclude Include="AppProcess.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Address.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -7,13 +7,13 @@ AppProcess::AppProcess()
 AppProcess* AppProcess::Create(LPCWSTR name)
 {
     AppProcess* proccess = new AppProcess();
-	HWND hGameWindow = FindWindow(NULL, name);
-	GetWindowThreadProcessId(hGameWindow, &proccess->m_pid);
+	proccess->m_hwnd = FindWindow(NULL, name);
+	GetWindowThreadProcessId(proccess->m_hwnd, &proccess->m_pid);
 	proccess->m_pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, proccess->m_pid);
 	return proccess;
 }
 
-DWORD AppProcess::getBaseAddress()
+uintptr_t AppProcess::getBaseAddress()
 {
     if (this->m_pHandle == NULL)
         return NULL; 
@@ -31,7 +31,7 @@ DWORD AppProcess::getBaseAddress()
     return (DWORD)lphModule[0]; // Module 0 is apparently always the EXE itself, returning its address
 }
 
-DWORD AppProcess::getModuleBaseAddress(TCHAR* moduleName)
+uintptr_t AppProcess::getModuleBaseAddress(TCHAR* moduleName)
 {
     DWORD moduleBaseAddress = 0;
     HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, this->m_pid);
@@ -51,4 +51,18 @@ DWORD AppProcess::getModuleBaseAddress(TCHAR* moduleName)
     CloseHandle(hSnap);
     return moduleBaseAddress;
     return 0;
+}
+
+glm::vec2 AppProcess::getWindowPosition()
+{
+    RECT rect;
+    GetWindowRect(m_hwnd, &rect);
+    return glm::vec2(rect.left, rect.top);
+}
+
+glm::vec2 AppProcess::getWindowSize()
+{
+    RECT rect;
+    GetWindowRect(m_hwnd, &rect);
+    return glm::vec2(rect.right - rect.left, rect.bottom - rect.top);
 }
