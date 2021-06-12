@@ -66,3 +66,8 @@ glm::vec2 AppProcess::getWindowSize()
     GetWindowRect(m_hwnd, &rect);
     return glm::vec2(rect.right - rect.left, rect.bottom - rect.top);
 }
+
+bool AppProcess::isOpen()
+{
+    return m_pHandle != NULL;
+}

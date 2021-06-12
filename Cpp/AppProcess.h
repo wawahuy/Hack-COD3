@@ -17,6 +17,7 @@ public:
 	uintptr_t getModuleBaseAddress(TCHAR* moduleName);
 	glm::vec2 getWindowPosition();
 	glm::vec2 getWindowSize();
+	bool isOpen();
 	
 	template<class T>
 	BOOL  readProcessMemory(uintptr_t address, T& varOut, unsigned int size, unsigned int* numberOfByteRead);
