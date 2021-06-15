@@ -1,18 +1,25 @@
 #pragma once
 #include "AppProcess.h"
 #include "Address.h"
+#include "glm/vec3.hpp"
 
 namespace address {
+
+	struct SDataCamera {
+		glm::fvec3 eye, forward, left, up;
+	};
+
 	enum EBase {
 		Entity = 0x00E7DC50,		// Address pointer of entity first
 		Player = 0x0003A784,		// Address pointer 0 of player
-		ViewMatrix = 0x20EB908
+		DataCamera = 0x20EB908
 	};
 
 	enum EEntity {
 		Next = 0x74,				// Offset next pointer of EBase::Entity
 		Heal = 0x150,				// Offset next data of entity
-		EntityVec3 = 0x344,
+		EntityVec3 = 0x1C,
+		//EntityVec3 = 0x344,
 	};
 
 	enum EPlayer {

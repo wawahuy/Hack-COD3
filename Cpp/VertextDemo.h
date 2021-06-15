@@ -47,6 +47,7 @@ float demoVertices[] = {
     -1.0f, 1.0f, 1.0f,
     1.0f,-1.0f, 1.0f
 };
+
 unsigned char demoColors[sizeof(demoVertices) / sizeof(float)];
 
 void demoGenerationColor() {
@@ -54,3 +55,20 @@ void demoGenerationColor() {
         demoColors[i] = rand() % 255;
     }
 }
+
+const float demoVerAxis[] = {
+    0.0f, 0.0f, 0.0f,
+    5.0f, 0.0f, 0.0f,
+    0.0f, 0.0f, 0.0f,
+    0.0f, 5.0f, 0.0f,
+    0.0f, 0.0f, 0.0f,
+    0.0f, 0.0f, 5.0f,
+};
+const float demoColAxis[] = {
+    1.0f, 0.0f, 0.0f,
+    1.0f, 0.0f, 0.0f,
+    0.0f, 1.0f, 0.0f,
+    0.0f, 1.0f, 0.0f,
+    0.0f, 0.0f, 1.0f,
+    0.0f, 0.0f, 1.0f,
+};

@@ -3,6 +3,7 @@
 #include "imgui/imgui_impl_opengl3.h"
 #include <iostream>
 #include <stdio.h>
+#include <functional>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <Windows.h>
@@ -12,16 +13,31 @@
 #include "Address.h"
 #include "AppProcess.h"
 #include "Timer.h"
-
-#define DEBUG_GRAPHICS
-
-#ifdef DEBUG_GRAPHICS
 #include "VertextDemo.h"
-#endif
+
+//#define DEBUG_GRAPHICS
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
 #pragma comment(lib, "legacy_stdio_definitions")
 #endif
+
+glm::fmat4 createCamera(glm::fvec3 eye, glm::fvec3 forward, glm::fvec3 left, glm::fvec3 up) {
+    glm::fmat4 matrixOut = glm::fmat4(1.0f);
+    float* matrix = (float*)&matrixOut;
+    matrix[0] = left.x;
+    matrix[4] = left.y;
+    matrix[8] = left.z;
+    matrix[1] = up.x;
+    matrix[5] = up.y;
+    matrix[9] = up.z;
+    matrix[2] = forward.x;
+    matrix[6] = forward.y;
+    matrix[10] = forward.z;
+    matrix[12] = -left.x * eye.x - left.y * eye.y - left.z * eye.z;
+    matrix[13] = -up.x * eye.x - up.y * eye.y - up.z * eye.z;
+    matrix[14] = -forward.x * eye.x - forward.y * eye.y - forward.z * eye.z;
+    return matrixOut;
+}
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -40,10 +56,10 @@ int main(int, char**)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
-#ifdef DEBUG_GRAPHICS
     // fn
     demoGenerationColor();
 
+#ifdef DEBUG_GRAPHICS
     // get monitor
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
     if (!monitor) {
@@ -110,6 +126,15 @@ int main(int, char**)
     // Goooooo!
     bool visibleMenu = false;
 
+    address::SDataCamera dataCamera;
+    Timer tickShowCameraVector;
+
+    float rotate = 0;
+    const float aspect = (float)gameWindowSize.x / (float)gameWindowSize.y;
+    const float fnear = 0.1f;
+    const float ffar = 100000.0f;
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspect, fnear, ffar);
+
     // Main loop
     while (!glfwWindowShouldClose(window))
     {
@@ -132,6 +157,12 @@ int main(int, char**)
             }
         }
 
+        glm::mat4 view;
+        if (p->readProcessMemory(gameBaseAddress + address::DataCamera, dataCamera)) {
+            //view = createCamera(dataCamera.eye, dataCamera.forward, dataCamera.left, dataCamera.up);
+            view = glm::lookAt(dataCamera.eye, dataCamera.eye + dataCamera.forward, glm::fvec3(0, 0, 1));
+        }
+
         // Rendering
         ImGui::Render();
         int display_w, display_h;
@@ -140,48 +171,84 @@ int main(int, char**)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glLoadIdentity();
 
-#ifdef DEBUG_GRAPHICS
-        if (GetAsyncKeyState(VK_ESCAPE) & 1) {
-            return 0;
-        }
-        //std::cout << "-----------" << std::endl;
-        static float rotate = 0;
-        rotate += 0.01f;
+        //-5691.930664, 4043.582275, 1364.362915
+        glm::mat4 model =
+            glm::translate(glm::fmat4(1.0f), glm::fvec3(-5594.130371, 3809.487549, 1369.621216)) *
+            glm::rotate(glm::mat4(1.0f), 12.0f, glm::fvec3(1.0f, 0.5f, 0.25f));
 
-        const float aspect = (float)gameWindowSize.x / (float)gameWindowSize.y;
-        const float fnear = -2.0f;
-        const float ffar = 10.0f;
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspect, fnear, ffar);
-        glm::mat4 view = glm::lookAt(glm::vec3(0,0, -10.0f), glm::vec3(0, 0, 0), glm::vec3(0, -1.0f, 0));
-        glm::mat4 model = glm::rotate(glm::mat4(1.0f), rotate, glm::fvec3(1.0f, 0.5f, 0.25f));
-        glDepthRange(fnear, ffar);
-
-        glLineWidth(3.0f);
+        glLineWidth(1.0f);
         glBegin(GL_TRIANGLES);
         for (int i = 0; i < sizeof(demoVertices) / sizeof(float) / 3; i++) {
             const glm::vec3 vertex = *(glm::fvec3*)&demoVertices[i * 3];
             glColor3ubv(&demoColors[i * 3]);
 
-            const glm::vec4 p1 = projection * view * model * glm::vec4(vertex, 1.0f);
+            const glm::vec4 pModel = model * glm::vec4(vertex, 1.0f);
+            const glm::vec4 pView =  view * pModel;
+            const glm::vec4 p1 = projection * pView;
             if (p1.w < 0.1f) {
                 continue;
             }
 
             // ndc
             const glm::vec3 pNdc = glm::fvec3(p1) / p1.w;
-
-            // screen cood
-            glm::vec3 screenPos(1.0f);
-            screenPos.x = 1 / 2.0f * pNdc.x + 0 + 1 / 2.0f;
-            screenPos.y = 1 / 2.0f * pNdc.y + 0 + 1 / 2.0f;
-            screenPos.z = ((fnear - ffar) / 2.0f * pNdc.z + fnear + ffar) / 2.0f;
-
-            glVertex3fv((float*)&screenPos);
-
-            //std::cout << glm::to_string(vertex) << " -> " << glm::to_string(p1) << " -> " << glm::to_string(pNdc) << " -> " << glm::to_string(screenPos) << std::endl;
+            glVertex3fv((float*)&pNdc);
         }
         glEnd();
-#endif // DEBUG_GRAPHICS
+
+
+        glBegin(GL_LINES);
+        int coutEntity = 0;
+
+        if (tickShowCameraVector.elapsed() > 1000) {
+            std::cout << "----" << std::endl;
+            std::cout << "position: " << glm::to_string(*(glm::fvec3*)&dataCamera.eye) << std::endl;
+            std::cout << "forward: " << glm::to_string(*(glm::fvec3*)&dataCamera.forward) << std::endl;
+            std::cout << "left: " << glm::to_string(*(glm::fvec3*)&dataCamera.left) << std::endl;
+            std::cout << "up: " << glm::to_string(*(glm::fvec3*)&dataCamera.up) << std::endl;
+            std::cout << "matrix: " << glm::to_string(view) << std::endl;
+        }
+
+        for (int i = 0; i < 100; i++) {
+            DWORD address;
+            if (p->readProcessMemory(gameBaseAddress + address::Entity + address::Next * i, address)) {
+                int heal;
+                if (!p->readProcessMemory(address + address::Heal, heal) || heal <= 0 || heal > 50000) {
+                    continue;
+                }
+                coutEntity++;
+                
+                glm::fvec3 pos;
+                if (p->readProcessMemory(address + address::EntityVec3, pos)) {
+                    glColor3ub(255, 255, 0);
+
+                    const glm::vec4 p1 = projection * view * glm::vec4(pos, 1.0f);
+                    if (p1.w < 0.1f) {
+                        continue;
+                    }
+
+                    // ndc
+                    const glm::vec3 pNdc = glm::fvec3(p1) / p1.w;
+                    if (tickShowCameraVector.elapsed() > 1000) {
+                        std::cout << "=>> 0x" << std::hex << address::Next * i << std::endl;
+                        std::cout << "pWord: " << glm::to_string(pos) << std::endl;
+                        std::cout << "pView: " << glm::to_string(p1) << std::endl;
+                        std::cout << "pNdc: " << glm::to_string(pNdc) << std::endl;
+                        std::cout << "heal: " << heal << std::endl;
+                    }
+
+
+                    glVertex3f(0, -1.0f, 0);
+                    glVertex3fv((float*)&pNdc);
+                }
+            }
+        }
+        glEnd();
+
+
+        if (tickShowCameraVector.elapsed() > 1000) {
+            std::cout << "num: " << coutEntity << std::endl;
+            tickShowCameraVector.reset();
+        }
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
