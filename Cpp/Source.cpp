@@ -15,8 +15,6 @@
 #include "Timer.h"
 #include "VertextDemo.h"
 
-//#define DEBUG_GRAPHICS
-
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
 #pragma comment(lib, "legacy_stdio_definitions")
 #endif
@@ -157,12 +155,6 @@ int main(int, char**)
             }
         }
 
-        glm::mat4 view;
-        if (p->readProcessMemory(gameBaseAddress + address::DataCamera, dataCamera)) {
-            //view = createCamera(dataCamera.eye, dataCamera.forward, dataCamera.left, dataCamera.up);
-            view = glm::lookAt(dataCamera.eye, dataCamera.eye + dataCamera.forward, glm::fvec3(0, 0, 1));
-        }
-
         // Rendering
         ImGui::Render();
         int display_w, display_h;
@@ -171,34 +163,15 @@ int main(int, char**)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glLoadIdentity();
 
-        //-5691.930664, 4043.582275, 1364.362915
-        glm::mat4 model =
-            glm::translate(glm::fmat4(1.0f), glm::fvec3(-5594.130371, 3809.487549, 1369.621216)) *
-            glm::rotate(glm::mat4(1.0f), 12.0f, glm::fvec3(1.0f, 0.5f, 0.25f));
+        glm::mat4 view, pv;
+        if (p->readProcessMemory(gameBaseAddress + address::DataCamera, dataCamera)) {
+            view = glm::lookAt(dataCamera.eye, dataCamera.eye + dataCamera.forward, glm::fvec3(0, 0, 1));
+            pv = projection * view;
+        }
 
         glLineWidth(1.0f);
-        glBegin(GL_TRIANGLES);
-        for (int i = 0; i < sizeof(demoVertices) / sizeof(float) / 3; i++) {
-            const glm::vec3 vertex = *(glm::fvec3*)&demoVertices[i * 3];
-            glColor3ubv(&demoColors[i * 3]);
-
-            const glm::vec4 pModel = model * glm::vec4(vertex, 1.0f);
-            const glm::vec4 pView =  view * pModel;
-            const glm::vec4 p1 = projection * pView;
-            if (p1.w < 0.1f) {
-                continue;
-            }
-
-            // ndc
-            const glm::vec3 pNdc = glm::fvec3(p1) / p1.w;
-            glVertex3fv((float*)&pNdc);
-        }
-        glEnd();
-
-
         glBegin(GL_LINES);
         int coutEntity = 0;
-
         if (tickShowCameraVector.elapsed() > 1000) {
             std::cout << "----" << std::endl;
             std::cout << "position: " << glm::to_string(*(glm::fvec3*)&dataCamera.eye) << std::endl;
@@ -217,11 +190,11 @@ int main(int, char**)
                 }
                 coutEntity++;
                 
-                glm::fvec3 pos;
-                if (p->readProcessMemory(address + address::EntityVec3, pos)) {
+                glm::fvec3 positionEntity;
+                if (p->readProcessMemory(address + address::EntityVec3, positionEntity)) {
                     glColor3ub(255, 255, 0);
 
-                    const glm::vec4 p1 = projection * view * glm::vec4(pos, 1.0f);
+                    const glm::vec4 p1 = pv * glm::vec4(positionEntity, 1.0f);
                     if (p1.w < 0.1f) {
                         continue;
                     }
@@ -230,12 +203,11 @@ int main(int, char**)
                     const glm::vec3 pNdc = glm::fvec3(p1) / p1.w;
                     if (tickShowCameraVector.elapsed() > 1000) {
                         std::cout << "=>> 0x" << std::hex << address::Next * i << std::endl;
-                        std::cout << "pWord: " << glm::to_string(pos) << std::endl;
-                        std::cout << "pView: " << glm::to_string(p1) << std::endl;
-                        std::cout << "pNdc: " << glm::to_string(pNdc) << std::endl;
                         std::cout << "heal: " << heal << std::endl;
+                        std::cout << "pWord: " << glm::to_string(positionEntity) << std::endl;
+                        std::cout << "pPVM: " << glm::to_string(p1) << std::endl;
+                        std::cout << "pNdc: " << glm::to_string(pNdc) << std::endl;
                     }
-
 
                     glVertex3f(0, -1.0f, 0);
                     glVertex3fv((float*)&pNdc);
