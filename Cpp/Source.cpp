@@ -131,9 +131,9 @@ int main(int, char**)
     bool noReloadBullet = false;
     bool unlimitedBullet = false;
     bool hasEspDraw = true;
-    float espColorLine[3] = { 255, 255, 0 };
-    float espColorBox[3] = { 255, 255, 0 };;
-    float espColorHeal[3] = { 255, 0, 0 };;
+    float espColorLine[3] = { 1, 1, 0.0f };
+    float espColorBox[3] = { 1, 1, 0.0f };;
+    float espColorHeal[3] = { 1, 0.0f, 0.0f };;
     Timer tickRewriteMemory;
 
     // Main loop
@@ -207,7 +207,7 @@ int main(int, char**)
                     glm::fvec3 positionEntity;
                     if (p->readProcessMemory(address + address::EntityVec3, positionEntity)) {
                         // draw box
-                        glColor3f(espColorBox[0]/255, espColorBox[1]/255, espColorBox[2]/255);
+                        glColor3f(espColorBox[0], espColorBox[1], espColorBox[2]);
                         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
                         glBegin(GL_QUADS);
                         for (int i = 0; i < 16; i++) {
@@ -221,7 +221,7 @@ int main(int, char**)
 
 
                         // draw heal
-                        glColor3f(espColorHeal[0]/255, espColorHeal[1]/255, espColorHeal[2]/255);
+                        glColor3f(espColorHeal[0], espColorHeal[1], espColorHeal[2]);
                         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
                         glm::vec3 healPosition = positionEntity + glm::fvec3(25.0f, 0, 0);
                         glm::vec3 healNdcStart;
@@ -253,7 +253,7 @@ int main(int, char**)
                         }
 
                         glLineWidth(1.0f);
-                        glColor3f(espColorLine[0]/255, espColorLine[1]/255, espColorLine[2]/255);
+                        glColor3f(espColorLine[0], espColorLine[1], espColorLine[2]);
                         glBegin(GL_LINES);
                         glVertex3f(0, -1.0f, 0);
                         glVertex3fv((float*)&pNdc);
