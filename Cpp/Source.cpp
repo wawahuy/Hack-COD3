@@ -13,29 +13,12 @@
 #include "Address.h"
 #include "AppProcess.h"
 #include "Timer.h"
-#include "VertextDemo.h"
+#include "VertexSample.h"
+#include "Graphics.h"
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
 #pragma comment(lib, "legacy_stdio_definitions")
 #endif
-
-glm::fmat4 createCamera(glm::fvec3 eye, glm::fvec3 forward, glm::fvec3 left, glm::fvec3 up) {
-    glm::fmat4 matrixOut = glm::fmat4(1.0f);
-    float* matrix = (float*)&matrixOut;
-    matrix[0] = left.x;
-    matrix[4] = left.y;
-    matrix[8] = left.z;
-    matrix[1] = up.x;
-    matrix[5] = up.y;
-    matrix[9] = up.z;
-    matrix[2] = forward.x;
-    matrix[6] = forward.y;
-    matrix[10] = forward.z;
-    matrix[12] = -left.x * eye.x - left.y * eye.y - left.z * eye.z;
-    matrix[13] = -up.x * eye.x - up.y * eye.y - up.z * eye.z;
-    matrix[14] = -forward.x * eye.x - forward.y * eye.y - forward.z * eye.z;
-    return matrixOut;
-}
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -53,9 +36,6 @@ int main(int, char**)
     const char* glsl_version = "#version 130";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-
-    // fn
-    demoGenerationColor();
 
 #ifdef DEBUG_GRAPHICS
     // get monitor
@@ -77,6 +57,11 @@ int main(int, char**)
     }
     glm::u32vec2 gameWindowSize = p->getWindowSize();
     glm::u32vec2 gameWindowPosition = p->getWindowPosition();
+    uintptr_t playerBaseAddress;
+    if (!p->readProcessMemory(gameBaseAddress + address::Player, playerBaseAddress)) {
+        std::cout << "Player not found!" << std::endl;
+        return 0;
+    }
 #endif
 
     // hint
@@ -133,6 +118,20 @@ int main(int, char**)
     const float ffar = 100000.0f;
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspect, fnear, ffar);
 
+    glm::fvec3 verticesBox[16];
+    buildQuadsBox(verticesBox, glm::vec3(20.0f, 20.0f, 50.0f));
+    for (int i = 0; i < 16; i++) {
+        verticesBox[i] = glm::translate(glm::fmat4(1.0f), glm::fvec3(0.0f, 0.0f, 20.0f)) * glm::fvec4(verticesBox[i], 1.0f);
+    }
+
+    bool noReloadBullet = false;
+    bool unlimitedBullet = false;
+    bool hasEspDraw = true;
+    float espColorLine[3] = { 255, 255, 0 };
+    float espColorBox[3] = { 255, 255, 0 };;
+    float espColorHeal[3] = { 255, 0, 0 };;
+    Timer tickRewriteMemory;
+
     // Main loop
     while (!glfwWindowShouldClose(window))
     {
@@ -150,7 +149,15 @@ int main(int, char**)
         }
 
         if (visibleMenu) {
-            if (ImGui::Button("Test")) {
+            ImGui::Checkbox("No reload bullet", &noReloadBullet);
+            ImGui::Checkbox("Unlimited bullet", &unlimitedBullet);
+            ImGui::Checkbox("ESP", &hasEspDraw);
+            if (hasEspDraw) {
+                ImGui::ColorEdit3("ESP Color Line", espColorLine, 0);
+                ImGui::ColorEdit3("ESP Color Box", espColorBox, 0);
+                ImGui::ColorEdit3("ESP Color Heal", espColorHeal, 0);
+            }
+            if (ImGui::Button("Exit")) {
                 return 0;
             }
         }
@@ -163,63 +170,113 @@ int main(int, char**)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glLoadIdentity();
 
-        glm::mat4 view, pv;
-        if (p->readProcessMemory(gameBaseAddress + address::DataCamera, dataCamera)) {
-            view = glm::lookAt(dataCamera.eye, dataCamera.eye + dataCamera.forward, glm::fvec3(0, 0, 1));
-            pv = projection * view;
-        }
+        if (hasEspDraw) {
+            glm::mat4 view, pv;
+            if (p->readProcessMemory(gameBaseAddress + address::DataCamera, dataCamera)) {
+                view = glm::lookAt(dataCamera.eye, dataCamera.eye + dataCamera.forward, glm::fvec3(0, 0, 1));
+                pv = projection * view;
+            }
 
-        glLineWidth(1.0f);
-        glBegin(GL_LINES);
-        int coutEntity = 0;
-        if (tickShowCameraVector.elapsed() > 1000) {
-            std::cout << "----" << std::endl;
-            std::cout << "position: " << glm::to_string(*(glm::fvec3*)&dataCamera.eye) << std::endl;
-            std::cout << "forward: " << glm::to_string(*(glm::fvec3*)&dataCamera.forward) << std::endl;
-            std::cout << "left: " << glm::to_string(*(glm::fvec3*)&dataCamera.left) << std::endl;
-            std::cout << "up: " << glm::to_string(*(glm::fvec3*)&dataCamera.up) << std::endl;
-            std::cout << "matrix: " << glm::to_string(view) << std::endl;
-        }
+            glLineWidth(1.0f);
+            int coutEntity = 0;
+            if (tickShowCameraVector.elapsed() > 1000) {
+                std::cout << "----" << std::endl;
+                std::cout << "position: " << glm::to_string(*(glm::fvec3*)&dataCamera.eye) << std::endl;
+                std::cout << "forward: " << glm::to_string(*(glm::fvec3*)&dataCamera.forward) << std::endl;
+                std::cout << "left: " << glm::to_string(*(glm::fvec3*)&dataCamera.left) << std::endl;
+                std::cout << "up: " << glm::to_string(*(glm::fvec3*)&dataCamera.up) << std::endl;
+                std::cout << "matrix: " << glm::to_string(view) << std::endl;
+            }
 
-        for (int i = 0; i < 100; i++) {
-            DWORD address;
-            if (p->readProcessMemory(gameBaseAddress + address::Entity + address::Next * i, address)) {
-                int heal;
-                if (!p->readProcessMemory(address + address::Heal, heal) || heal <= 0 || heal > 50000) {
-                    continue;
-                }
-                coutEntity++;
-                
-                glm::fvec3 positionEntity;
-                if (p->readProcessMemory(address + address::EntityVec3, positionEntity)) {
-                    glColor3ub(255, 255, 0);
 
-                    const glm::vec4 p1 = pv * glm::vec4(positionEntity, 1.0f);
-                    if (p1.w < 0.1f) {
+            for (int i = 0; i < 100; i++) {
+                DWORD address;
+                if (p->readProcessMemory(gameBaseAddress + address::Entity + address::Next * i, address)) {
+                    int heal;
+                    if (!p->readProcessMemory(address + address::Heal, heal) || heal <= 0 || heal > 50000) {
                         continue;
                     }
+                    coutEntity++;
 
-                    // ndc
-                    const glm::vec3 pNdc = glm::fvec3(p1) / p1.w;
-                    if (tickShowCameraVector.elapsed() > 1000) {
-                        std::cout << "=>> 0x" << std::hex << address::Next * i << std::endl;
-                        std::cout << "heal: " << heal << std::endl;
-                        std::cout << "pWord: " << glm::to_string(positionEntity) << std::endl;
-                        std::cout << "pPVM: " << glm::to_string(p1) << std::endl;
-                        std::cout << "pNdc: " << glm::to_string(pNdc) << std::endl;
+                    glm::fvec3 positionEntity;
+                    if (p->readProcessMemory(address + address::EntityVec3, positionEntity)) {
+                        // draw box
+                        glColor3f(espColorBox[0]/255, espColorBox[1]/255, espColorBox[2]/255);
+                        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                        glBegin(GL_QUADS);
+                        for (int i = 0; i < 16; i++) {
+                            glm::vec3 pNdc;
+                            if (!word2Screen(verticesBox[i], pNdc, pv * glm::translate(glm::fmat4(1.0f), positionEntity))) {
+                                continue;
+                            }
+                            glVertex3fv((float*)&pNdc);
+                        }
+                        glEnd();
+
+
+                        // draw heal
+                        glColor3f(espColorHeal[0]/255, espColorHeal[1]/255, espColorHeal[2]/255);
+                        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                        glm::vec3 healPosition = positionEntity + glm::fvec3(25.0f, 0, 0);
+                        glm::vec3 healNdcStart;
+                        if (word2Screen(healPosition, healNdcStart, pv)) {
+                            glm::vec3 healNdcEnd;
+                            int maxZ = 50;
+                            int maxHeal = 100;
+                            int z = std::min(heal * maxZ / maxHeal, maxZ);
+                            if (word2Screen(healPosition + glm::vec3(0, 0, z), healNdcEnd, pv)) {
+                                glLineWidth(5.0f);
+                                glBegin(GL_LINES);
+                                glVertex3fv((float*)&healNdcStart);
+                                glVertex3fv((float*)&healNdcEnd);
+                                glEnd();
+                            }
+                        }
+
+                        // draw line (0, -1) -> entity
+                        glm::vec3 pNdc;
+                        if (!word2Screen(positionEntity, pNdc, pv)) {
+                            continue;
+                        }
+
+                        if (tickShowCameraVector.elapsed() > 1000) {
+                            std::cout << "=>> 0x" << std::hex << address::Next * i << std::endl;
+                            std::cout << "heal: " << std::dec << heal << std::endl;
+                            std::cout << "pWord: " << glm::to_string(positionEntity) << std::endl;
+                            std::cout << "pNdc: " << glm::to_string(pNdc) << std::endl;
+                        }
+
+                        glLineWidth(1.0f);
+                        glColor3f(espColorLine[0]/255, espColorLine[1]/255, espColorLine[2]/255);
+                        glBegin(GL_LINES);
+                        glVertex3f(0, -1.0f, 0);
+                        glVertex3fv((float*)&pNdc);
+                        glEnd();
                     }
-
-                    glVertex3f(0, -1.0f, 0);
-                    glVertex3fv((float*)&pNdc);
                 }
             }
+
+
+            if (tickShowCameraVector.elapsed() > 1000) {
+                std::cout << "num: " << coutEntity << std::endl;
+                tickShowCameraVector.reset();
+            }
         }
-        glEnd();
 
-
-        if (tickShowCameraVector.elapsed() > 1000) {
-            std::cout << "num: " << coutEntity << std::endl;
-            tickShowCameraVector.reset();
+        if (tickRewriteMemory.elapsed() > 1000) {
+            if (noReloadBullet) {
+                int re = 2000;
+                if (!p->writeProcessMemory(playerBaseAddress + address::BulletReload1, re)) {
+                    std::cout << "Dont write reload bullet!" << std::endl;
+                }
+            }
+            if (unlimitedBullet) {
+                int re = 2000;
+                if (!p->writeProcessMemory(playerBaseAddress + address::Bullet1, re)) {
+                    std::cout << "Dont write bullet !" << std::endl;
+                }
+            }
+            tickRewriteMemory.reset();
         }
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
