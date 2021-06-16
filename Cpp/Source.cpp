@@ -27,6 +27,10 @@ static void glfw_error_callback(int error, const char* description)
 
 int main(int, char**)
 {
+#ifdef NDEBUG
+    ShowWindow(GetConsoleWindow(), SW_HIDE);
+#endif
+
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
@@ -179,6 +183,8 @@ int main(int, char**)
 
             glLineWidth(1.0f);
             int coutEntity = 0;
+
+#ifndef NDEBUG
             if (tickShowCameraVector.elapsed() > 1000) {
                 std::cout << "----" << std::endl;
                 std::cout << "position: " << glm::to_string(*(glm::fvec3*)&dataCamera.eye) << std::endl;
@@ -187,7 +193,7 @@ int main(int, char**)
                 std::cout << "up: " << glm::to_string(*(glm::fvec3*)&dataCamera.up) << std::endl;
                 std::cout << "matrix: " << glm::to_string(view) << std::endl;
             }
-
+#endif
 
             for (int i = 0; i < 100; i++) {
                 DWORD address;
@@ -256,11 +262,12 @@ int main(int, char**)
                 }
             }
 
-
+#ifndef NDEBUG
             if (tickShowCameraVector.elapsed() > 1000) {
                 std::cout << "num: " << coutEntity << std::endl;
                 tickShowCameraVector.reset();
             }
+#endif
         }
 
         if (tickRewriteMemory.elapsed() > 1000) {
