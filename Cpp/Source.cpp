@@ -150,6 +150,9 @@ int main(int, char**)
         if (GetAsyncKeyState(VK_INSERT) & 1) {
             visibleMenu = !visibleMenu;
             glfwSetWindowAttrib(window, GLFW_MOUSE_PASSTHROUGH, !visibleMenu);
+            if (visibleMenu) {
+                glfwFocusWindow(window);
+            }
         }
 
         if (visibleMenu) {
