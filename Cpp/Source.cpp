@@ -87,7 +87,7 @@ int main(int, char**)
     glfwSetWindowAttrib(window, GLFW_DECORATED, false);
     glfwSetWindowAttrib(window, GLFW_MOUSE_PASSTHROUGH, true);
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); // Enable vsync
+    glfwSwapInterval(0); // disable vsync
 
     // Initialize OpenGL loader
     bool err = glewInit() != GLEW_OK;
@@ -132,9 +132,24 @@ int main(int, char**)
     bool unlimitedBullet = false;
     bool hasEspDraw = true;
     float espColorLine[3] = { 1, 1, 0.0f };
+    float espColorFocus[3] = { 0.0f, 0.0f, 0.3f };
     float espColorBox[3] = { 1, 1, 0.0f };;
     float espColorHeal[3] = { 1, 0.0f, 0.0f };;
     Timer tickRewriteMemory;
+
+    struct EntityDetail {
+        glm::fvec3 position;
+        glm::fvec3 ndc;
+        glm::fvec3 closestPointCameraRay;
+        float closetLength;
+        int heal;
+        int id;
+    };
+
+    // Fps check
+    Timer tickLimitFps;
+    const int FPS_MAX = 30;
+    const int FRAME_PER_TIME = 1000.0f / FPS_MAX;
 
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -160,6 +175,7 @@ int main(int, char**)
             ImGui::Checkbox("Unlimited bullet", &unlimitedBullet);
             ImGui::Checkbox("ESP", &hasEspDraw);
             if (hasEspDraw) {
+                ImGui::ColorEdit3("ESP Color Aim", espColorFocus, 0);
                 ImGui::ColorEdit3("ESP Color Line", espColorLine, 0);
                 ImGui::ColorEdit3("ESP Color Box", espColorBox, 0);
                 ImGui::ColorEdit3("ESP Color Heal", espColorHeal, 0);
@@ -184,8 +200,6 @@ int main(int, char**)
                 pv = projection * view;
             }
 
-            glLineWidth(1.0f);
-            int coutEntity = 0;
 
 #ifndef NDEBUG
             if (tickShowCameraVector.elapsed() > 1000) {
@@ -198,79 +212,111 @@ int main(int, char**)
             }
 #endif
 
+            std::vector<EntityDetail> entites;
+            Ray ray { dataCamera.eye, dataCamera.forward };
+            int closestId = -1;
+
+
+            // find detail list entities
             for (int i = 0; i < 100; i++) {
                 DWORD address;
                 if (p->readProcessMemory(gameBaseAddress + address::Entity + address::Next * i, address)) {
-                    int heal;
-                    if (!p->readProcessMemory(address + address::Heal, heal) || heal <= 0 || heal > 50000) {
+                    EntityDetail detail{};
+                    detail.id = entites.size();
+
+                    // read heal
+                    if (!p->readProcessMemory(address + address::Heal, detail.heal) || detail.heal <= 0 || detail.heal > 50000) {
                         continue;
                     }
-                    coutEntity++;
 
-                    glm::fvec3 positionEntity;
-                    if (p->readProcessMemory(address + address::EntityVec3, positionEntity)) {
-                        // draw box
-                        glColor3f(espColorBox[0], espColorBox[1], espColorBox[2]);
-                        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                        glBegin(GL_QUADS);
-                        for (int i = 0; i < 16; i++) {
-                            glm::vec3 pNdc;
-                            if (!word2Screen(verticesBox[i], pNdc, pv * glm::translate(glm::fmat4(1.0f), positionEntity))) {
-                                continue;
-                            }
-                            glVertex3fv((float*)&pNdc);
-                        }
-                        glEnd();
-
-
-                        // draw heal
-                        glColor3f(espColorHeal[0], espColorHeal[1], espColorHeal[2]);
-                        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                        glm::vec3 healPosition = positionEntity + glm::fvec3(25.0f, 0, 0);
-                        glm::vec3 healNdcStart;
-                        if (word2Screen(healPosition, healNdcStart, pv)) {
-                            glm::vec3 healNdcEnd;
-                            int maxZ = 50;
-                            int maxHeal = 100;
-                            int z = std::min(heal * maxZ / maxHeal, maxZ);
-                            if (word2Screen(healPosition + glm::vec3(0, 0, z), healNdcEnd, pv)) {
-                                glLineWidth(5.0f);
-                                glBegin(GL_LINES);
-                                glVertex3fv((float*)&healNdcStart);
-                                glVertex3fv((float*)&healNdcEnd);
-                                glEnd();
-                            }
-                        }
-
-                        // draw line (0, -1) -> entity
-                        glm::vec3 pNdc;
-                        if (!word2Screen(positionEntity, pNdc, pv)) {
+                    // read position & compute pos screen
+                    if (p->readProcessMemory(address + address::EntityVec3, detail.position)) {
+                        if (!word2Screen(detail.position, detail.ndc, pv)) {
                             continue;
                         }
-
                         if (tickShowCameraVector.elapsed() > 1000) {
                             std::cout << "=>> 0x" << std::hex << address::Next * i << std::endl;
-                            std::cout << "heal: " << std::dec << heal << std::endl;
-                            std::cout << "pWord: " << glm::to_string(positionEntity) << std::endl;
-                            std::cout << "pNdc: " << glm::to_string(pNdc) << std::endl;
+                            std::cout << "heal: " << std::dec << detail.heal << std::endl;
+                            std::cout << "pWord: " << glm::to_string(detail.position) << std::endl;
+                            std::cout << "pNdc: " << glm::to_string(detail.ndc) << std::endl;
+                        }
+                        
+                        // compute closest point
+                        detail.closestPointCameraRay = closestPoint(ray, detail.position);
+                        detail.closetLength = glm::length(detail.position - detail.closestPointCameraRay);
+                        if (closestId == -1 || detail.closetLength < entites[closestId].closetLength) {
+                            closestId = detail.id;
                         }
 
-                        glLineWidth(1.0f);
-                        glColor3f(espColorLine[0], espColorLine[1], espColorLine[2]);
-                        glBegin(GL_LINES);
-                        glVertex3f(0, -1.0f, 0);
-                        glVertex3fv((float*)&pNdc);
-                        glEnd();
+                        entites.push_back(detail);
                     }
                 }
             }
 
 #ifndef NDEBUG
             if (tickShowCameraVector.elapsed() > 1000) {
-                std::cout << "num: " << coutEntity << std::endl;
+                std::cout << "num: " << entites.size() << std::endl;
                 tickShowCameraVector.reset();
             }
 #endif
+
+
+            for (const EntityDetail &entity: entites) {
+                // draw line
+                if (entity.id == closestId) {
+                    glLineWidth(2.0f);
+                    glColor3f(espColorFocus[0], espColorFocus[1], espColorFocus[2]);
+                }
+                else {
+                    glLineWidth(1.0f);
+                    glColor3f(espColorLine[0], espColorLine[1], espColorLine[2]);
+                }
+                glBegin(GL_LINES);
+                glVertex3f(0, -1.0f, 0);
+                glVertex3fv((float*)&entity.ndc);
+                glEnd();
+
+
+                // draw box
+                if (entity.id == closestId) {
+                    glLineWidth(2.0f);
+                    glColor3f(espColorFocus[0], espColorFocus[1], espColorFocus[2]);
+                }
+                else {
+                    glLineWidth(1.0f);
+                    glColor3f(espColorBox[0], espColorBox[1], espColorBox[2]);
+                }
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                glBegin(GL_QUADS);
+                for (int i = 0; i < 16; i++) {
+                    glm::vec3 pNdc;
+                    if (!word2Screen(verticesBox[i], pNdc, pv * glm::translate(glm::fmat4(1.0f), entity.position))) {
+                        continue;
+                    }
+                    glVertex3fv((float*)&pNdc);
+                }
+                glEnd();
+
+
+                // draw heal
+                glColor3f(espColorHeal[0], espColorHeal[1], espColorHeal[2]);
+                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                glm::vec3 healPosition = entity.position + glm::fvec3(25.0f, 0, 0);
+                glm::vec3 healNdcStart;
+                if (word2Screen(healPosition, healNdcStart, pv)) {
+                    glm::vec3 healNdcEnd;
+                    int maxZ = 50;
+                    int maxHeal = 100;
+                    int z = std::min(entity.heal * maxZ / maxHeal, maxZ);
+                    if (word2Screen(healPosition + glm::vec3(0, 0, z), healNdcEnd, pv)) {
+                        glLineWidth(5.0f);
+                        glBegin(GL_LINES);
+                        glVertex3fv((float*)&healNdcStart);
+                        glVertex3fv((float*)&healNdcEnd);
+                        glEnd();
+                    }
+                }
+            }
         }
 
         if (tickRewriteMemory.elapsed() > 1000) {
@@ -291,6 +337,11 @@ int main(int, char**)
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
+
+        if (tickLimitFps.elapsed() < FRAME_PER_TIME) {
+            Sleep(FRAME_PER_TIME - tickLimitFps.elapsed());
+        }
+        tickLimitFps.reset();
     }
 
     // Cleanup

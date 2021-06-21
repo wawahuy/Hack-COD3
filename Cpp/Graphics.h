@@ -1,6 +1,13 @@
 #pragma once
 #include "glm/glm.hpp"
 
-bool word2Screen(glm::fvec3 world, glm::fvec3& out, const glm::fmat4& matrix);
+struct Ray {
+	glm::fvec3 position;
+	glm::fvec3 normal;
+};
 
-glm::fmat4 createCamera(glm::fvec3 eye, glm::fvec3 forward, glm::fvec3 left, glm::fvec3 up);
+bool word2Screen(const glm::fvec3& world, glm::fvec3& out, const glm::fmat4& matrix);
+
+glm::fmat4 createCamera(const glm::fvec3& eye, const glm::fvec3& forward, const glm::fvec3& left, const glm::fvec3& up);
+
+glm::fvec3 closestPoint(const Ray& ray, const glm::fvec3& p);
